@@ -1,8 +1,8 @@
 import socket
-import threading
 import time
 import random
 import json
+import os
 from datetime import datetime
 
 users = [
@@ -15,17 +15,9 @@ users = [
   { "user_id": "usr_2239", "user_city": "Toulouse" }
 ]
 
-sellers = [
-  { "seller_id": "sel_0214" },
-  { "seller_id": "sel_1150" },
-  { "seller_id": "sel_4489" },
-  { "seller_id": "sel_7731" },
-  { "seller_id": "sel_9022" }
-]
-
 products = [
   { "product_id": "prod_5501", "product_cat": "Véhicules", "price": 4500.00, "seller_id": "sel_0214" },
-  { "product_id": "prod_8832", "product_cat": "Véhicules", "price": 12000.00, "seller_id": "sel_1150" },
+  { "product_id": "prod_8832", "price": 12000.00, "seller_id": "sel_1150" },
   { "product_id": "prod_1120", "product_cat": "Immobilier", "price": 250000.00, "seller_id": "sel_4489" },
   { "product_id": "prod_4401", "product_cat": "Mode", "price": 45.00, "seller_id": "sel_7731" },
   { "product_id": "prod_9923", "product_cat": "Électronique", "price": 650.00, "seller_id": "sel_9022" },
@@ -35,96 +27,64 @@ products = [
 
 actions = ["AIME", "VOUT", "ACHAT"]
 
-#
-# SERVEUR 
-#
-def serveur():
+def main():
+    # Assurer que le dossier data existe
+    os.makedirs("./data", exist_ok=True)
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(("localhost", 9990)) 
+    s.bind(("localhost", 9990))
     s.listen(1)
-    print("[SERVEUR] En attente de connexion...")
+    print("[SIMULATEUR] En attente que Spark Streaming se connecte sur le port 9990...")
 
     conn, addr = s.accept()
-    print(f"[SERVEUR] Client connecté depuis {addr}")
-    buffer = ""
+    print(f"[SIMULATEUR] Spark est connecté depuis {addr} ! Début de l'envoi...")
+
     with open("./data/fluxDirect.json", "a", encoding="utf-8", buffering=1) as jsonfile:
         while True:
-            try:
-                data = conn.recv(4096).decode()
-                if not data:
-                    break
-                
-                buffer += data
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    if line.strip():
-                        jsonfile.write(line + "\n")
-                        print(f"[SERVEUR ENREGISTRÉ] {line}")
-                        
-            except Exception as e:
-                print(f"[SERVEUR ERREUR] {e}")
+            if not products:
+                print("[SIMULATEUR] Plus aucun produit disponible. Fin de la simulation.")
                 break
-        conn.close()
 
-#
-# CLIENT 
-#
-def client():
-    c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            user_choisi = random.choice(users)
+            product_choisi = random.choice(products)
+            action_choisie = random.choice(actions)
+            
+            timestamp_actuel = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
 
-    while True:
-        try:
-            print("[CLIENT] Tentative de connexion au serveur...")
-            c.connect(("localhost", 9990)) 
-            print("[CLIENT] Connecté au serveur avec succès !")
-            break 
-        except ConnectionRefusedError:
-            print("[CLIENT] Serveur indisponible, nouvelle tentative dans 1 seconde...")
-            time.sleep(1)
+            evenement = {
+                "timestamp": timestamp_actuel,
+                "user_id": user_choisi["user_id"],
+                "user_city": user_choisi["user_city"],
+                "product_id": product_choisi["product_id"],
+                "product_cat": product_choisi.get("product_cat", "Inconnu"), 
+                "seller_id": product_choisi["seller_id"],  
+                "action_type": action_choisie,
+                "price": product_choisi["price"]
+            }
 
-    while True:
-        # Arret si plus de produits
-        if not products:
-            print("[CLIENT] Plus aucun produit disponible à la vente. Fin de la simulation.")
-            break
+            if action_choisie == "ACHAT":
+                products.remove(product_choisi)
+                print(f"[SÉCURITÉ] Produit {product_choisi['product_id']} vendu et retiré.")
 
-        user_choisi = random.choice(users)
-        product_choisi = random.choice(products)
-        action_choisie = random.choice(actions)
-        
-        timestamp_actuel = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+            try:
+                json_data = json.dumps(evenement) + "\n"
+                
+                # 1. On envoie en direct à Spark via le socket
+                conn.send(json_data.encode('utf-8'))
+                
+                # 2. On écrit en même temps dans le fichier local pour backup
+                jsonfile.write(json_data)
+                
+                print(f"[ENVOYÉ & ENREGISTRÉ] {json_data.strip()}")
+                time.sleep(1)
+                
+            except Exception as e:
+                print(f"[ERREUR] Connexion interrompue avec Spark : {e}")
+                break
 
-        evenement = {
-            "timestamp": timestamp_actuel,
-            "user_id": user_choisi["user_id"],
-            "user_city": user_choisi["user_city"],
-            "product_id": product_choisi["product_id"],
-            "product_cat": product_choisi["product_cat"],
-            "seller_id": product_choisi["seller_id"],  
-            "action_type": action_choisie,
-            "price": product_choisi["price"]
-        }
+    conn.close()
+    s.close()
 
-        # Si un produit est acheté il n'est plus disponible a la vente
-        if action_choisie == "ACHAT":
-            products.remove(product_choisi)
-            print(f"[SÉCURITÉ] Produit {product_choisi['product_id']} vendu et retiré du catalogue.")
-
-        try:
-            json_data = json.dumps(evenement) + "\n"
-            c.send(json_data.encode())
-            time.sleep(1)
-        except Exception as e:
-            print(f"[CLIENT ERREUR] Perte de connexion : {e}")
-            break
-
-# Lancement des threads
-t1 = threading.Thread(target=serveur, daemon=True)
-t2 = threading.Thread(target=client, daemon=True)
-
-t1.start()
-t2.start()
-
-while True:
-    time.sleep(10)
+if __name__ == "__main__":
+    main()
