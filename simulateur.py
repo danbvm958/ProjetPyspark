@@ -47,17 +47,25 @@ def serveur():
 
     conn, addr = s.accept()
     print(f"[SERVEUR] Client connecté depuis {addr}")
-
-    while True:
-        try:
-            data = conn.recv(1024).decode().strip()
-            if not data:
+    buffer = ""
+    with open("./data/fluxDirect.json", "a", encoding="utf-8", buffering=1) as jsonfile:
+        while True:
+            try:
+                data = conn.recv(4096).decode()
+                if not data:
+                    break
+                
+                buffer += data
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    if line.strip():
+                        jsonfile.write(line + "\n")
+                        print(f"[SERVEUR ENREGISTRÉ] {line}")
+                        
+            except Exception as e:
+                print(f"[SERVEUR ERREUR] {e}")
                 break
-            print(f"[SERVEUR REÇU] {data}")
-        except Exception as e:
-            print(f"[SERVEUR ERREUR] {e}")
-            break
-    conn.close()
+        conn.close()
 
 #
 # CLIENT 
@@ -76,6 +84,11 @@ def client():
             time.sleep(1)
 
     while True:
+        # Arret si plus de produits
+        if not products:
+            print("[CLIENT] Plus aucun produit disponible à la vente. Fin de la simulation.")
+            break
+
         user_choisi = random.choice(users)
         product_choisi = random.choice(products)
         action_choisie = random.choice(actions)
@@ -93,8 +106,12 @@ def client():
             "price": product_choisi["price"]
         }
 
+        # Si un produit est acheté il n'est plus disponible a la vente
+        if action_choisie == "ACHAT":
+            products.remove(product_choisi)
+            print(f"[SÉCURITÉ] Produit {product_choisi['product_id']} vendu et retiré du catalogue.")
+
         try:
-            # Sérialisation en JSON + saut de ligne + encodage en bytes
             json_data = json.dumps(evenement) + "\n"
             c.send(json_data.encode())
             time.sleep(1)
