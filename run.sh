@@ -15,7 +15,10 @@ SIM_PID=$!
 sleep 2
 
 echo "Lancement de l'analyseur PySpark..."
-spark-submit --packages graphframes:graphframes:0.8.2-spark3.2-s_2.12 analyseur.py
+spark-submit \
+  --packages io.graphframes:graphframes-spark4_2.13:0.11.0 \
+  --driver-java-options "-Dsun.security.jgss.native=true --add-opens=java.base/javax.security.auth=ALL-UNNAMED" \
+  analyseur.py
 
 # Gestion de l'arrêt complet
 trap "kill $SIM_PID" EXIT

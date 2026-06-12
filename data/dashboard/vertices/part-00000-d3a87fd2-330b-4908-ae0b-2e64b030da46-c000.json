@@ -1,0 +1,12 @@
+{"id":"usr_5567","type":"U","label":"Lille"}
+{"id":"usr_3321","type":"U","label":"Marseille"}
+{"id":"usr_4412","type":"U","label":"Nantes"}
+{"id":"usr_8891","type":"U","label":"Bordeaux"}
+{"id":"sel_0214","type":"S","label":"Vendeur"}
+{"id":"sel_4489","type":"S","label":"Vendeur"}
+{"id":"sel_1150","type":"S","label":"Vendeur"}
+{"id":"sel_7731","type":"S","label":"Vendeur"}
+{"id":"prod_1120","type":"P","label":"Immobilier"}
+{"id":"prod_3312","type":"P","label":"Mode"}
+{"id":"prod_8832","type":"P","label":"Inconnu"}
+{"id":"prod_5501","type":"P","label":"Véhicules"}

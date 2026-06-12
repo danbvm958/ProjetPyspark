@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-
+"""
+Projet d'Ingénierie Big Data & Analyse de Graphes Temps Réel
+Module : Plateforme de Streaming Infini d'Interactions Commerciales
+Fichier : analyseur.py (Pipeline PySpark Structured Streaming & GraphFrames)
+"""
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
@@ -94,9 +99,11 @@ def process_batch(df_batch, batch_id):
 
 
     # 4. EXPORT POUR LE DASHBOARD VISUEL (Mode Persistance)
+
+    # Sauvegarde des états du graphe courant pour lecture par le Dashboard
     try:
-        vertices_df.write.mode("overwrite").json("./data/dashboard/vertices")
-        edges_df.write.mode("overwrite").json("./data/dashboard/edges")
+        vertices_df.write.mode("append").json("./data/dashboard/vertices")
+        edges_df.write.mode("append").json("./data/dashboard/edges")
     except Exception as e:
         print(f"[ERREUR EXPORT DASHBOARD] {e}")
 
@@ -121,18 +128,7 @@ def main():
         .select(from_json(col("value").cast("string"), event_schema).alias("data")) \
         .select("data.*")
 
-    # Gestion du temps : Application du Watermarking (10 minutes)
-    stream_with_watermark = parsed_stream \
-        .withWatermark("timestamp", "10 minutes")
-
-    # Agrégation temporelle secondaire (Exemple de fenêtrage demandé par le sujet)
-    # Calcule le volume global des actions par tranches glissantes
-    windowed_aggregations = stream_with_watermark \
-        .groupBy(window(col("timestamp"), "5 minutes", "2 minutes"), col("action_type")) \
-        .count()
-
-    # Déploiement de la mécanique d'analyse de graphe par micro-batch
-    query = stream_with_watermark.writeStream \
+    query = parsed_stream.writeStream \
         .foreachBatch(process_batch) \
         .outputMode("update") \
         .start()
