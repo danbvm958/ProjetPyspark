@@ -9,7 +9,6 @@ Affiche KPI, graphiques interactifs et l'historique des événements.
 import json
 import math
 from pathlib import Path
-from collections import Counter
 import pandas as pd
 import streamlit as st
 import plotly.express as px

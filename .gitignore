@@ -1,4 +1,9 @@
 .venv/
 venv/
 
+# Generated files
+__pycache__/
+*.pyc
+.streamlit/
+
 data/

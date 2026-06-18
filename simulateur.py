@@ -25,7 +25,7 @@ products = [
   { "product_id": "prod_6674", "product_cat": "Électronique", "price": 35.00, "seller_id": "sel_0214" }
 ]
 
-actions = ["AIME", "VOULU", "ACHAT"]
+actions = ["AIME", "VOUT", "ACHAT"]
 
 def main():
     # Assurer que le dossier data existe

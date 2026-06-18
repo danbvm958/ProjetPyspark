@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import subprocess
-import signal
 import shutil
 import importlib
 import webbrowser
