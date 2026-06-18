@@ -27,19 +27,37 @@ def kill_process_on_port(port):
         subprocess.run(f"fuser -k {port}/tcp", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 def setup_java_env():
-    """Configure la variable JAVA_HOME de manière dynamique si nécessaire."""
-    # Optionnel : Si vous voulez forcer un chemin sous Linux uniquement
-    if not sys.platform.startswith('win'):
-        linux_java = "/usr/lib/jvm/java-17-openjdk-amd64"
-        if os.path.exists(linux_java):
-            os.environ["JAVA_HOME"] = linux_java
-            os.environ["PATH"] = f"{linux_java}/bin:{os.environ['PATH']}"
-            print(f"Java 17 configuré pour Linux : {linux_java}")
-    else:
-        # Sous Windows, il s'appuiera sur le JAVA_HOME du système. 
-        # Vous pouvez décommenter la ligne suivante si vous voulez forcer un chemin Windows :
-        # os.environ["JAVA_HOME"] = r"C:\Program Files\Java\jdk-17"
-        print(f"Windows: Utilisation du JAVA_HOME système : {os.environ.get('JAVA_HOME', 'Non défini')}")
+    """Configure dynamiquement Java, Spark PIP et Hadoop Local."""
+    if sys.platform.startswith('win'):
+        print("--- Configuration de l'environnement Windows (PIP Spark) ---")
+        
+        # 1. Chemin JDK Java
+        os.environ["JAVA_HOME"] = r"C:\Program Files\Java\jdk-17" 
+        
+        # 2. Configurer HADOOP_HOME dynamiquement par rapport au projet
+        # Récupère le dossier racine du projet (où se trouve ce script)
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        os.environ["HADOOP_HOME"] = os.path.join(project_root, "hadoop")
+        
+        # 3. Trouver le Spark de PIP
+        venv_root = os.path.dirname(os.path.dirname(sys.executable))
+        pip_spark_home = os.path.join(venv_root, "Lib", "site-packages", "pyspark")
+        os.environ["SPARK_HOME"] = pip_spark_home
+        
+        # 4. Configurer Python pour Spark
+        os.environ["PYSPARK_PYTHON"] = sys.executable
+        os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
+        # 5. Mettre à jour le PATH complet
+        spark_bin = os.path.join(pip_spark_home, "bin")
+        java_bin = os.path.join(os.environ["JAVA_HOME"], "bin")
+        hadoop_bin = os.path.join(os.environ["HADOOP_HOME"], "bin")
+        
+        os.environ["PATH"] = f"{spark_bin};{java_bin};{hadoop_bin};{os.environ['PATH']}"
+        
+        print(f"[OK] JAVA_HOME : {os.environ['JAVA_HOME']}")
+        print(f"[OK] HADOOP_HOME local : {os.environ['HADOOP_HOME']}")
+        print(f"[OK] SPARK_HOME détecté dans venv : {os.environ['SPARK_HOME']}")
 
 def main():
     # 1. Libérer le port 9990
@@ -51,14 +69,17 @@ def main():
 
     # 3. Lancer le simulateur en arrière-plan
     print("\n--- Lancement du simulateur.py ---")
-    sim_proc = subprocess.Popen([sys.executable, "simulateur.py"])
+    sim_proc = subprocess.Popen([sys.executable, "simulateur.py"], env=os.environ.copy())
     
     # Pause pour laisser le socket se lier (bind)
     time.sleep(2)
 
     # 4. Préparer la commande Spark-Submit
+    # On va chercher le chemin exact vers le fichier spark-submit de pip
+    spark_submit_path = os.path.join(os.environ["SPARK_HOME"], "bin", "spark-submit.cmd")
+
     spark_cmd = [
-        "spark-submit",
+        spark_submit_path, # On utilise le chemin absolu généré
         "--packages", "io.graphframes:graphframes-spark4_2.13:0.11.0",
         "--driver-java-options", "-Dsun.security.jgss.native=true --add-opens=java.base/javax.security.auth=ALL-UNNAMED",
         "analyseur.py"

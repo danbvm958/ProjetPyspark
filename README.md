@@ -22,7 +22,7 @@ ou
 
 `pip install grapheframes`
 
-`pip install spark-submi
+`pip install spark-submit`
 
 
 ## lancement 
