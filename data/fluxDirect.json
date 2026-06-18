@@ -128,3 +128,9 @@
 {"timestamp": "2026-06-18T12:33:55.000Z", "user_id": "usr_1043", "user_city": "Lyon", "product_id": "prod_5501", "product_cat": "V\u00e9hicules", "seller_id": "sel_0214", "action_type": "VOUT", "price": 4500.0}
 {"timestamp": "2026-06-18T12:33:56.000Z", "user_id": "usr_2239", "user_city": "Toulouse", "product_id": "prod_5501", "product_cat": "V\u00e9hicules", "seller_id": "sel_0214", "action_type": "VOUT", "price": 4500.0}
 {"timestamp": "2026-06-18T12:33:57.000Z", "user_id": "usr_2239", "user_city": "Toulouse", "product_id": "prod_5501", "product_cat": "V\u00e9hicules", "seller_id": "sel_0214", "action_type": "ACHAT", "price": 4500.0}
+{"timestamp": "2026-06-18T13:47:18.000Z", "user_id": "usr_8891", "user_city": "Bordeaux", "product_id": "prod_1120", "product_cat": "Immobilier", "seller_id": "sel_4489", "action_type": "VOUT", "price": 250000.0}
+{"timestamp": "2026-06-18T13:47:19.000Z", "user_id": "usr_9482", "user_city": "Paris", "product_id": "prod_5501", "product_cat": "V\u00e9hicules", "seller_id": "sel_0214", "action_type": "VOUT", "price": 4500.0}
+{"timestamp": "2026-06-18T13:47:20.000Z", "user_id": "usr_4412", "user_city": "Nantes", "product_id": "prod_8832", "product_cat": "Inconnu", "seller_id": "sel_1150", "action_type": "ACHAT", "price": 12000.0}
+{"timestamp": "2026-06-18T13:47:21.000Z", "user_id": "usr_3321", "user_city": "Marseille", "product_id": "prod_5501", "product_cat": "V\u00e9hicules", "seller_id": "sel_0214", "action_type": "ACHAT", "price": 4500.0}
+{"timestamp": "2026-06-18T13:47:22.000Z", "user_id": "usr_3321", "user_city": "Marseille", "product_id": "prod_3312", "product_cat": "Mode", "seller_id": "sel_7731", "action_type": "VOUT", "price": 120.0}
+{"timestamp": "2026-06-18T13:47:23.000Z", "user_id": "usr_1043", "user_city": "Lyon", "product_id": "prod_1120", "product_cat": "Immobilier", "seller_id": "sel_4489", "action_type": "VOUT", "price": 250000.0}

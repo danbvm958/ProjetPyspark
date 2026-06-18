@@ -68,7 +68,7 @@ def process_batch(df_batch, batch_id):
 
     # 2. MODÉLISATION DES ARÊTES : [src, dst, relationship]
 
-    # Liens : Utilisateurs -(AIME/VOUT/ACHAT)-> Produits
+    # Liens : Utilisateurs -(AIME/VOULU/ACHAT)-> Produits
     user_to_product_edges = df_batch.select(
         col("user_id").alias("src"),
         col("product_id").alias("dst"),
