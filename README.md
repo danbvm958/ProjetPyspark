@@ -20,7 +20,7 @@ ou
 
 `pip install pyspark`
 
-`pip install grapheframes`
+`pip install graphframes`
 
 `pip install spark-submit`
 
