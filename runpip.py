@@ -3,6 +3,9 @@ import sys
 import time
 import subprocess
 import signal
+import shutil
+import importlib
+import webbrowser
 
 PORT = 9990
 
@@ -59,6 +62,22 @@ def setup_java_env():
         print(f"[OK] HADOOP_HOME local : {os.environ['HADOOP_HOME']}")
         print(f"[OK] SPARK_HOME détecté dans venv : {os.environ['SPARK_HOME']}")
 
+def get_spark_submit_path():
+    try:
+        pyspark = importlib.import_module("pyspark")
+        spark_pkg = os.path.dirname(pyspark.__file__)
+        candidates = [
+            os.path.join(spark_pkg, "bin", "spark-submit.cmd"),
+            os.path.join(spark_pkg, "bin", "spark-submit.bat"),
+            os.path.join(spark_pkg, "bin", "spark-submit"),
+        ]
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return candidate
+    except Exception:
+        pass
+    return shutil.which("spark-submit")
+
 def main():
     # 1. Libérer le port 9990
     kill_process_on_port(PORT)
@@ -74,34 +93,71 @@ def main():
     # Pause pour laisser le socket se lier (bind)
     time.sleep(2)
 
-    # 4. Préparer la commande Spark-Submit
-    # On va chercher le chemin exact vers le fichier spark-submit de pip
-    spark_submit_path = os.path.join(os.environ["SPARK_HOME"], "bin", "spark-submit.cmd")
-
-    spark_cmd = [
-        spark_submit_path, # On utilise le chemin absolu généré
-        "--packages", "io.graphframes:graphframes-spark4_2.13:0.11.0",
-        "--driver-java-options", "-Dsun.security.jgss.native=true --add-opens=java.base/javax.security.auth=ALL-UNNAMED",
-        "analyseur.py"
-    ]
-
-    # Sous Windows, spark-submit est parfois un fichier .cmd, shell=True aide à le trouver
-    use_shell = sys.platform.startswith('win')
-
-    print("\n--- Lancement de l'analyseur PySpark (spark-submit) ---")
+    # 4. Lancer le dashboard moderne (Streamlit) en premier si disponible
+    STREAMLIT_PORT = 8501
+    st_proc = None
     try:
-        # Lance Spark et attend la fin de son exécution (bloquant)
-        spark_proc = subprocess.run(spark_cmd, shell=use_shell)
+        import streamlit  # type: ignore
+        print("[INFO] Streamlit détecté : lancement du dashboard moderne via streamlit run")
+        streamlit_cmd = [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            "dashboard_app.py",
+            "--server.port",
+            str(STREAMLIT_PORT),
+            "--server.headless",
+            "true",
+        ]
+        st_proc = subprocess.Popen(streamlit_cmd, env=os.environ.copy(), shell=False)
+        # Ouvre automatiquement le navigateur sur l'URL du dashboard
+        try:
+            url = f"http://localhost:{STREAMLIT_PORT}"
+            time.sleep(1.5)
+            webbrowser.open_new_tab(url)
+        except Exception:
+            pass
+    except Exception:
+        st_proc = None
+
+    # 5. Préparer et lancer Spark-Submit (optionnel) — ne bloque pas le dashboard si inexistant
+    spark_submit_path = get_spark_submit_path()
+    if not spark_submit_path or not os.path.exists(spark_submit_path):
+        print("[WARN] spark-submit introuvable. Le pipeline Spark ne sera pas lancé automatiquement.")
+    else:
+        spark_cmd = [
+            spark_submit_path,
+            "--packages", "io.graphframes:graphframes-spark4_2.13:0.11.0",
+            "--driver-java-options", "-Dsun.security.jgss.native=true --add-opens=java.base/javax.security.auth=ALL-UNNAMED",
+            "analyseur.py"
+        ]
+        try:
+            print("\n--- Lancement de l'analyseur PySpark (spark-submit) ---")
+            spark_proc = subprocess.Popen(spark_cmd, env=os.environ.copy(), shell=False)
+        except Exception as e:
+            print(f"[ERREUR] Échec du lancement Spark: {e}")
+
+    # 6. Si Streamlit fonctionne, attend sa terminaison ; sinon lance fallback GUI local
+    try:
+        if st_proc is not None:
+            st_proc.wait()
+        else:
+            try:
+                from interface import main as launch_interface
+                launch_interface()
+            except Exception as e:
+                print(f"[ERREUR] Impossible de lancer l'interface locale : {e}")
     except KeyboardInterrupt:
         print("\nInterruption détectée par l'utilisateur.")
     finally:
-        # 5. Nettoyage à la fermeture : on s'assure que le simulateur s'arrête
-        print("\n--- Arrêt du simulateur ---")
-        if sim_proc.poll() is None:  # Si le processus tourne encore
-            if sys.platform.startswith('win'):
-                sim_proc.terminate()
-            else:
-                os.kill(sim_proc.pid, signal.SIGTERM)
+        print("\n--- Arrêt des processus de fond ---")
+        if sim_proc.poll() is None:
+            sim_proc.terminate()
+        if 'spark_proc' in locals() and spark_proc.poll() is None:
+            spark_proc.terminate()
+        if st_proc is not None and st_proc.poll() is None:
+            st_proc.terminate()
         print("Fin de l'exécution.")
 
 if __name__ == "__main__":
