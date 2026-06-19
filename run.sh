@@ -45,7 +45,10 @@ STREAMLIT_PID=$!
 # Attendre un instant que Streamlit démarre
 sleep 2
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9e7bc67e66ee2d4b44671a46abd006fd9fef8607
 # --- GESTION DE L'ARRÊT GLOBAL ---
 # Cette section s'exécute dès que l'utilisateur fait un Ctrl+C dans le terminal
 cleanup() {
