@@ -44,11 +44,6 @@ STREAMLIT_PID=$!
 # Attendre un instant que Streamlit démarre
 sleep 2
 
-# 6. Lancement de l'interface Tkinter de secours (Bloquant)
-echo -e "\n=== [4/4] Lancement de l'interface locale Tkinter ==="
-echo "Note : La fermeture de la fenêtre Tkinter arrêtera l'ensemble du projet."
-$PYTHON_EXEC interface.py
-
 # --- GESTION DE L'ARRÊT GLOBAL ---
 # Cette section s'exécute dès que l'utilisateur ferme la fenêtre Tkinter ou fait un Ctrl+C
 cleanup() {

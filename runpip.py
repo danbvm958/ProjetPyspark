@@ -137,27 +137,5 @@ def main():
         except Exception as e:
             print(f"[ERREUR] Échec du lancement Spark: {e}")
 
-    # 6. Si Streamlit fonctionne, attend sa terminaison ; sinon lance fallback GUI local
-    try:
-        if st_proc is not None:
-            st_proc.wait()
-        else:
-            try:
-                from interface import main as launch_interface
-                launch_interface()
-            except Exception as e:
-                print(f"[ERREUR] Impossible de lancer l'interface locale : {e}")
-    except KeyboardInterrupt:
-        print("\nInterruption détectée par l'utilisateur.")
-    finally:
-        print("\n--- Arrêt des processus de fond ---")
-        if sim_proc.poll() is None:
-            sim_proc.terminate()
-        if 'spark_proc' in locals() and spark_proc.poll() is None:
-            spark_proc.terminate()
-        if st_proc is not None and st_proc.poll() is None:
-            st_proc.terminate()
-        print("Fin de l'exécution.")
-
 if __name__ == "__main__":
     main()
