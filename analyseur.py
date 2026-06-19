@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Projet d'Ingénierie Big Data & Analyse de Graphes Temps Réel
-Module : Plateforme de Streaming Infini d'Interactions Commerciales
-Fichier : analyseur.py (Pipeline PySpark Structured Streaming & GraphFrames)
-"""
-
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
-from pyspark.sql.functions import from_json, col, lit, window
+from pyspark.sql.functions import from_json, col, lit
 from graphframes import GraphFrame
 
 def init_spark_session():
-    """Initialise la SparkSession avec des configurations optimisées."""
+    """Initialise la SparkSession de manière isolée."""
     return SparkSession.builder \
         .appName("LeBonCoinStreamingGraph") \
         .config("spark.sql.shuffle.partitions", "2") \
         .getOrCreate()
 
 def get_event_schema():
-    """Définit le schéma strict pour le Schema Enforcement."""
+    """Retourne le schéma strict pour valider les données entrantes."""
     return StructType([
         StructField("timestamp", TimestampType(), True),
         StructField("user_id", StringType(), True),
@@ -32,104 +26,106 @@ def get_event_schema():
         StructField("price", DoubleType(), True)
     ])
 
-def process_batch(df_batch, batch_id):
-    if df_batch.isEmpty():
-        return
 
+def extraire_sommets(df_batch):
+    """
+    Fonction Pure : Transforme le DataFrame brut en un DataFrame de sommets uniques.
+    Modélisation : [id, type, label]
+    """
+    users = df_batch.select(col("user_id").alias("id"), lit("U").alias("type"), col("user_city").alias("label"))
+    sellers = df_batch.select(col("seller_id").alias("id"), lit("S").alias("type"), lit("Vendeur").alias("label"))
+    products = df_batch.select(col("product_id").alias("id"), lit("P").alias("type"), col("product_cat").alias("label"))
+    
+    # Union et suppression des doublons
+    return users.union(sellers).union(products).distinct()
+
+
+def extraire_aretes(df_batch):
+    """
+    Fonction Pure : Transforme le DataFrame brut en un DataFrame d'arêtes.
+    Modélisation : [src, dst, relationship]
+    """
+    # Liens : Utilisateurs -> Produits (Actions : AIME, ACHAT, etc.)
+    user_to_prod = df_batch.select(col("user_id").alias("src"), col("product_id").alias("dst"), col("action_type").alias("relationship"))
+    
+    # Liens : Vendeurs -> Produits
+    seller_to_prod = df_batch.select(col("seller_id").alias("src"), col("product_id").alias("dst"), lit("PROPOSE").alias("relationship"))
+    
+    return user_to_prod.union(seller_to_prod).distinct()
+
+
+def calculer_top_degres(graph, n=5):
+    """Fonction Pure : Calcule les n nœuds les plus connectés (Activité globale)."""
+    return graph.degrees.orderBy(col("degree").desc()).limit(n)
+
+
+def calculer_top_produits_populaires(graph, n=3):
+    """Fonction Pure : Calcule les n produits ayant le plus de liens entrants (In-Degree)."""
+    return graph.inDegrees.filter("id LIKE 'prod_%'").orderBy(col("inDegree").desc()).limit(n)
+
+
+def sauvegarder_donnees(vertices_df, edges_df, chemin_base="./data/dashboard"):
+    """Effet de bord : Persiste les sommets et les arêtes au format JSON."""
+    try:
+        vertices_df.write.mode("append").json(f"{chemin_base}/vertices")
+        edges_df.write.mode("append").json(f"{chemin_base}/edges")
+    except Exception as e:
+        print(f"[ERREUR EXPORT] Impossible de sauvegarder les données : {e}")
+
+
+def afficher_metriques(batch_id, df_degres, df_produits):
+    """Effet de bord : Centralise tous les affichages du Micro-Batch dans la console."""
     print(f"\n" + "="*50)
     print(f" TRAITEMENT DU MICRO-BATCH # {batch_id} ")
     print("="*50)
-
-    # 1. MODÉLISATION DES SOMMETS : [id, type, label]
-
-    # Entités Utilisateurs (U)
-    users_vertices = df_batch.select(
-        col("user_id").alias("id"),
-        lit("U").alias("type"),
-        col("user_city").alias("label")
-    ).distinct()
-
-    # Entités Vendeurs (S)
-    sellers_vertices = df_batch.select(
-        col("seller_id").alias("id"),
-        lit("S").alias("type"),
-        lit("Vendeur").alias("label")
-    ).distinct()
-
-    # Entités Produits (P)
-    products_vertices = df_batch.select(
-        col("product_id").alias("id"),
-        lit("P").alias("type"),
-        col("product_cat").alias("label")
-    ).distinct()
-
-    # Union de tous les sommets uniques du micro-batch
-    vertices_df = users_vertices.union(sellers_vertices).union(products_vertices).distinct()
-
-    # 2. MODÉLISATION DES ARÊTES : [src, dst, relationship]
-
-    # Liens : Utilisateurs -(AIME/VOUT/ACHAT)-> Produits
-    user_to_product_edges = df_batch.select(
-        col("user_id").alias("src"),
-        col("product_id").alias("dst"),
-        col("action_type").alias("relationship")
-    )
-
-    # Liens : Vendeurs -(PROPOSE)-> Produits
-    seller_to_product_edges = df_batch.select(
-        col("seller_id").alias("src"),
-        col("product_id").alias("dst"),
-        lit("PROPOSE").alias("relationship")
-    ).distinct()
-
-    # Union des arêtes
-    edges_df = user_to_product_edges.union(seller_to_product_edges)
-
-    # 3. INITIALISATION ET CALCULS GRAPHFRAMES
     
-    g = GraphFrame(vertices_df, edges_df)
-
-    # Indicateur A : Évolution des degrés des nœuds (Popularité / Activité)
     print("\n[MÉTRIQUE GRAPHE] Top 5 des nœuds les plus connectés (Degrés) :")
-    g.degrees.orderBy(col("degree").desc()).show(5, truncate=False)
+    df_degres.show(truncate=False)
+    
+    print("[MÉTRIQUE GRAPHE] Top 3 des Produits les plus populaires (In-Degree) :")
+    df_produits.show(truncate=False)
 
-    # Indicateur B : Centralité In-Degree (Spécifique aux Produits les plus ciblés)
-    print("[MÉTRIQUE GRAPHE] Top 3 des Produits les plus consultés/achetés (In-Degree) :")
-    g.inDegrees.filter("id LIKE 'prod_%'").orderBy(col("inDegree").desc()).show(3, truncate=False)
 
+def creer_processeur_de_batch():
+    """
+    Retourne une fonction de traitement (fermeture / closure).
+    Cette structure permet d'encapsuler la logique sans variables globales.
+    """
+    def processeur(df_batch, batch_id):
+        if df_batch.isEmpty():
+            return
 
-    # 4. EXPORT POUR LE DASHBOARD VISUEL (Mode Persistance)
+        
+        vertices_df = extraire_sommets(df_batch)
+        edges_df = extraire_aretes(df_batch)
+        g = GraphFrame(vertices_df, edges_df)
 
-    # Sauvegarde des états du graphe courant pour lecture par le Dashboard
-    try:
-        vertices_df.write.mode("append").json("./data/dashboard/vertices")
-        edges_df.write.mode("append").json("./data/dashboard/edges")
-    except Exception as e:
-        print(f"[ERREUR EXPORT DASHBOARD] {e}")
+        top_degres = calculer_top_degres(g)
+        top_produits = calculer_top_produits_populaires(g)
+
+        afficher_metriques(batch_id, top_degres, top_produits)
+        sauvegarder_donnees(vertices_df, edges_df)
+
+    return processeur
 
 
 def main():
-    # Initialisation de l'environnement Spark
     spark = init_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
-    # Définition du schéma d'entrée
-    event_schema = get_event_schema()
-
-    # Connexion au flux de streaming via le Socket TCP
+    # Connexion réseau au simulateur
     raw_stream = spark.readStream \
         .format("socket") \
         .option("host", "localhost") \
         .option("port", 9990) \
         .load()
 
-    # Désérialisation et Schema Enforcement
     parsed_stream = raw_stream \
-        .select(from_json(col("value").cast("string"), event_schema).alias("data")) \
+        .select(from_json(col("value").cast("string"), get_event_schema()).alias("data")) \
         .select("data.*")
 
     query = parsed_stream.writeStream \
-        .foreachBatch(process_batch) \
+        .foreachBatch(creer_processeur_de_batch()) \
         .outputMode("update") \
         .start()
 
