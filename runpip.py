@@ -140,13 +140,12 @@ def main():
     # 6. Si Streamlit fonctionne, attend sa terminaison ; sinon lance fallback GUI local
     try:
         if st_proc is not None:
+            print("\n[INFO] Le Dashboard Streamlit est actif. Appuyez sur Ctrl+C pour tout arrêter.")
             st_proc.wait()
         else:
-            try:
-                from interface import main as launch_interface
-                launch_interface()
-            except Exception as e:
-                print(f"[ERREUR] Impossible de lancer l'interface locale : {e}")
+            print("[ERREUR] Impossible de démarrer Streamlit et aucune interface alternative n'est configurée.")
+            while sim_proc.poll() is None:
+                time.sleep(1)
     except KeyboardInterrupt:
         print("\nInterruption détectée par l'utilisateur.")
     finally:

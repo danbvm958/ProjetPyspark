@@ -70,7 +70,6 @@ def formater_evenement(evenement):
     return json.dumps(evenement) + "\n"
 
 
-# --- ENTRÉES / SORTIES ET CYCLE DE VIE (Gestion des effets de bord) ---
 
 def gerer_flux(conn, jsonfile):
     """
