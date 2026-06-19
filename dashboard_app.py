@@ -246,7 +246,7 @@ def main():
     st.sidebar.header("Actions")
     if st.sidebar.button("Actualiser les données"):
         load_data.clear()
-        st.experimental_rerun()
+        st.rerun()
 
 
 if __name__ == "__main__":
